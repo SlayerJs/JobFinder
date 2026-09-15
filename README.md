@@ -142,17 +142,4 @@ Tests use temporary/in-memory databases and mock API responses. No API keys or b
 
 Keep new adapters under `src/scrapers`, implement `BaseScraper`, register supported sources, and add offline fixtures/tests for parsing changes. Keep personal examples and scraped data out of tests and commits.
 
-## Put the project in Git
 
-For a new repository:
-
-```sh
-git init
-git add README.md requirements.txt .gitignore .env.example config.example.yaml main.py manage.py src tests .github
-git diff --cached --stat
-git status --short
-```
-
-Review the staged files before committing. `.gitignore` does not remove files already tracked by an existing repository. The project does not configure a remote or publish anything automatically.
-
-After moving the project directory, use `python -m pip` with its virtual-environment interpreter. If your existing virtual environment stops working, recreate it at the new path using the setup instructions.
