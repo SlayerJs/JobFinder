@@ -1,0 +1,9 @@
+requests
+beautifulsoup4
+openai
+playwright
+python-dotenv
+schedule
+pyyaml
+pandas
+openpyxl

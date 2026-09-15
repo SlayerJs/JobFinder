@@ -1,0 +1,41 @@
+# Copy to config.local.yaml and customize. Local configuration is ignored by Git.
+# Each config file is complete; files are not merged.
+sources: [linkedin]
+search_profiles:
+  - keyword: software engineer
+    location: ''  # Supply a country or city; empty leaves the search unrestricted.
+    max_pages: 2
+
+criteria:
+  required:
+    - The offered role must involve software development.
+  tiers:
+    1: Direct match to the desired role and all stated preferences.
+    2: Strong match to the desired role with some preferred skills.
+    3: Adjacent role with relevant transferable skills.
+    4: Meets required criteria but is a weaker match.
+
+# Optional applicant-specific rules belong in your local configuration.
+custom_ai_rules: []
+preferences: []
+blacklist:
+  companies: []
+  keywords: []
+target:
+  start_date: null
+  end_date: null
+  missing_date: review  # review or flexible; only applies when a date bound is set.
+source_options: {}  # Example: apec: {contract_filter: 'source-specific code'}
+
+ai:
+  batch_input_tokens: 20000
+  max_jobs_per_batch: 10
+  output_tokens_per_job: 160
+  run_input_tokens: 500000
+  run_output_tokens: 50000
+  max_retries: 1
+  # Estimated USD rates per million tokens; adjust for your model and current prices.
+  price_per_million:
+    cached_input: 0.006
+    input: 0.30
+    output: 1.20

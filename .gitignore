@@ -1,0 +1,35 @@
+# Credentials and private search profiles
+.env
+.env.*
+!.env.example
+config.yaml
+config.local.yaml
+config.*.local.yaml
+
+# Runtime state and backups
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+backups/
+logs/
+reports/
+local_diagnostics/
+
+# Python and editor state
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+.agents/
+.codex/
