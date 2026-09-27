@@ -10,7 +10,7 @@ class DiscordNotifier:
     def __init__(self):
         self.webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
 
-    def send_job_alert(self, job: JobPosting, ai_reason: str, tier: str = "NONE"):
+    def send_job_alert(self, job: JobPosting, ai_reason: str, tier: str = "NONE", cv=None):
         if not self.webhook_url:
             logger.warning("Discord webhook URL not configured. Skipping alert.")
             return False
@@ -44,6 +44,11 @@ class DiscordNotifier:
             "footer": {"text": "JobFinder AI Pipeline"}
         }
 
+        if cv and (cv.get('category') or cv.get('cv')):
+            embed['fields'].extend([
+                {'name': 'Application category', 'value': cv.get('category') or 'Unassigned', 'inline': False},
+                {'name': 'Local CV revision', 'value': cv.get('cv') or 'Unassigned', 'inline': False},
+                {'name': 'Matching reason', 'value': cv.get('reason') or 'Awaiting classification', 'inline': False}])
         embed['title'] = embed['title'][:256]
         for field in embed['fields']:
             field['value'] = str(field['value'] or 'Unknown')[:1024]

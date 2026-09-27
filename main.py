@@ -95,6 +95,8 @@ def generate_run_summary(processed_records):
     data = []
     for r in processed_records:
         job = r['job']
+        from src.cv import recommendation
+        cv = recommendation(db, job.id) if db else {}
         data.append({
             "Status": r['status'],
             "Tier": str(r['tier']),
@@ -103,7 +105,10 @@ def generate_run_summary(processed_records):
             "Location": job.location,
             "Source": job.source,
             "AI Reason": r['reason'],
-            "URL": job.url
+            "URL": job.url,
+            "Application category": cv.get('category', ''),
+            "Recommended CV revision": cv.get('cv', ''),
+            "Matching reason": cv.get('reason', '')
         })
         
     df = pd.DataFrame(data)
@@ -174,8 +179,9 @@ def generate_run_summary(processed_records):
     return filepath, len(processed_records), approved_count
 
 def retry_notifications():
+    from src.cv import recommendation
     for row in db.pending_notifications():
-        if notifier.send_job_alert(db.to_job(row), row['ai_reason'], row['tier']):
+        if notifier.send_job_alert(db.to_job(row), row['ai_reason'], row['tier'], recommendation(db, row['id'])):
             db.notification_sent(row['id'])
 
 
@@ -215,6 +221,8 @@ def process_pending_jobs(dry_run=False):
         db.update_job_status(job.id,'REVIEW',reason,criteria_version=criteria_version())
         records.append(dict(job=job,status='REVIEW',tier='NONE',reason=reason))
     for batch in batches:
+        from src.cv import match_key, store_match
+        matching_revision = match_key(db)
         results = ai.evaluate_batch(batch, criteria)
         for job in batch:
             row = results.get(job.id)
@@ -224,6 +232,11 @@ def process_pending_jobs(dry_run=False):
                     reason += ' | Evidence: ' + row['evidence']
                 tier = str(row['tier']) if row['tier'] else 'NONE'
                 db.update_job_status(job.id,row['decision'],reason,tier,criteria_version())
+                if row['decision'] == 'APPROVED' and 'category_id' in row:
+                    try:
+                        store_match(db, job.id, row, matching_revision)
+                    except ValueError:
+                        logger.info('Matching unavailable for job %s; eligibility preserved for independent backfill', job.id)
                 records.append(dict(job=job,status=row['decision'],tier=tier,reason=reason))
             else:
                 records.append(dict(job=job,status='ERROR',tier='NONE',reason='Budget exhausted or invalid API result; remains pending'))
