@@ -12,6 +12,8 @@ class JobDatabase:
         self.conn = sqlite3.connect(db_path, check_same_thread=False, timeout=30)
         self.conn.row_factory = sqlite3.Row
         self.create_table()
+        from src.cv import migrate
+        migrate(self)
 
     def create_table(self):
         with self.lock, self.conn:
@@ -31,6 +33,8 @@ class JobDatabase:
                 run_id TEXT, model TEXT, jobs INTEGER, input_tokens INTEGER,
                 output_tokens INTEGER, cache_hit_tokens INTEGER, cache_miss_tokens INTEGER,
                 estimated INTEGER, cost_usd REAL, latency REAL, error TEXT)''')
+            if 'operation' not in {r['name'] for r in self.conn.execute('PRAGMA table_info(api_usage)')}:
+                self.conn.execute("ALTER TABLE api_usage ADD COLUMN operation TEXT DEFAULT 'posting_classification'")
             self.conn.execute('''CREATE TABLE IF NOT EXISTS evaluations (
                 id INTEGER PRIMARY KEY, job_id TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 status TEXT, tier TEXT, reason TEXT, criteria_version TEXT)''')
