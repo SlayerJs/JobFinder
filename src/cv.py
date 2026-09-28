@@ -404,16 +404,27 @@ class CVService:
         return category, profile, source, {'profile': profile['data'], 'category': category['data'], 'facts': source_facts(source)}
 
     @staticmethod
-    def generation_prompt(source):
-        from src.cv_latex import LATEX_RULES
-        return GENERATE + (LATEX_RULES if source['latex_source'] else '')
+    def generation_prompt(source, output_format='standard'):
+        from src.cv_latex import LATEX_RULES, STANDALONE_LATEX_RULES
+        if output_format not in ('standard', 'latex'):
+            raise ValueError('Choose standard or latex output')
+        return GENERATE + (LATEX_RULES if source['latex_source'] else
+                           STANDALONE_LATEX_RULES if output_format == 'latex' else '')
+
+    def generation_key(self, category_id, payload, source, output_format='standard'):
+        prompt = self.generation_prompt(source, output_format)
+        return self.cache_key('generation', [category_id, payload] +
+                              ([prompt] if source['latex_source'] or output_format == 'latex' else []))
 
     @staticmethod
-    def validate_draft(data, source, language):
+    def validate_draft(data, source, language, output_format='standard'):
         validated = validate_version(data, source, language)
         if source['latex_source']:
             from src.cv_latex import tailor_latex
             validated = tailor_latex(source, validated)
+        elif output_format == 'latex':
+            from src.cv_latex import standalone_latex
+            validated = standalone_latex(validated, source['contacts'], data.get('latex_layout'))
         return validated
 
     def cache_key(self, operation, payload):
@@ -496,14 +507,14 @@ class CVService:
                 self.db.conn.execute('UPDATE cv_matches SET stale=1 WHERE category_id=?', (cid,))
         return sorted(kept)
 
-    def generate(self, category_id):
+    def generate(self, category_id, output_format='standard'):
         category, profile, source, payload = self.generation_input(category_id)
-        key = self.cache_key('generation', [category_id, payload] + ([self.generation_prompt(source)] if source['latex_source'] else []))
+        key = self.generation_key(category_id, payload, source, output_format)
         cached = rows(self.db, 'SELECT id FROM cv_versions WHERE cache_key=? AND stale=0', (key,))
         if cached:
             return cached[0]['id']
-        data = self.request('cv_generation', self.generation_prompt(source), payload, 6000,
-                            lambda value: self.validate_draft(value, source, profile['data']['language']))
+        data = self.request('cv_generation', self.generation_prompt(source, output_format), payload, 6000,
+                            lambda value: self.validate_draft(value, source, profile['data']['language'], output_format))
         with self.db.lock, self.db.conn:
             self.generation_input(category_id)  # Reject a result whose inputs changed in flight.
             return self.db.conn.execute('INSERT INTO cv_versions(category_id,data,cache_key) VALUES (?,?,?)',
@@ -515,7 +526,10 @@ class CVService:
         _, profile, source, _ = self.generation_input(version['category_id'])
         if version['stale']:
             raise ValueError('Version is stale')
-        data = self.validate_draft(data, source, profile['data']['language'])
+        output_format = 'latex' if version['data'].get('latex_layout') else 'standard'
+        if output_format == 'latex' and isinstance(data, dict):
+            data = {**data, 'latex_layout': data.get('latex_layout', version['data']['latex_layout'])}
+        data = self.validate_draft(data, source, profile['data']['language'], output_format)
         with self.db.lock, self.db.conn:
             return self.db.conn.execute('INSERT INTO cv_versions(category_id,parent_id,data) VALUES (?,?,?)',
                                        (version['category_id'], version_id, encode(data))).lastrowid
@@ -529,7 +543,8 @@ class CVService:
             _, profile, source, _ = self.generation_input(version['category_id'])
             if version['stale']:
                 raise ValueError('Version is stale')
-            self.validate_draft(version['data'], source, profile['data']['language'])
+            self.validate_draft(version['data'], source, profile['data']['language'],
+                                'latex' if version['data'].get('latex_layout') else 'standard')
             inserted = self.db.conn.execute('INSERT OR IGNORE INTO cv_approvals(version_id) VALUES (?)', (version_id,))
             if not inserted.rowcount:
                 return
@@ -604,8 +619,9 @@ class CVService:
             requests = [(ANALYZE, encode(payload), 4500)]
         elif operation == 'generate':
             _, _, source, payload = self.generation_input(args['category_id'])
-            prompt = self.generation_prompt(source)
-            key = self.cache_key('generation', [args['category_id'], payload] + ([prompt] if source['latex_source'] else []))
+            output_format = args.get('output_format', 'standard')
+            prompt = self.generation_prompt(source, output_format)
+            key = self.generation_key(args['category_id'], payload, source, output_format)
             cached = bool(rows(self.db, 'SELECT id FROM cv_versions WHERE cache_key=? AND stale=0', (key,)))
             requests = [(prompt, encode(payload), 6000)]
         elif operation == 'classify':

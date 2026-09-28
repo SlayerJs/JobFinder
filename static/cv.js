@@ -157,6 +157,8 @@ document.querySelectorAll('.operation').forEach(button => handle(button, 'click'
   const args = {};
   if (button.dataset.sourceId) args.source_id = Number(button.dataset.sourceId);
   if (button.dataset.categoryId) args.category_id = Number(button.dataset.categoryId);
+  const outputFormat = document.getElementById('output-format-' + button.dataset.categoryId);
+  if (outputFormat) args.output_format = outputFormat.value;
   await estimate(button.dataset.operation, args);
 }));
 document.querySelectorAll('.retry').forEach(button => handle(button, 'click', () => estimate(button.dataset.operation, JSON.parse(button.dataset.args))));

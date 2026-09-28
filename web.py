@@ -137,8 +137,13 @@ def create_app(db_path='jobs.db', private_dir='private_cv', config=None, client=
         operation = body['operation']
         args = body.get('args', {})
         field = {'analyze': 'source_id', 'generate': 'category_id'}.get(operation)
-        if not isinstance(args, dict) or set(args) != ({field} if field else set()) or (field and type(args[field]) is not int):
+        required = {field} if field else set()
+        optional = {'output_format'} if operation == 'generate' else set()
+        if (not isinstance(args, dict) or not required.issubset(args) or set(args) - required - optional
+                or (field and type(args[field]) is not int)):
             raise ValueError('Invalid operation arguments')
+        if 'output_format' in args and args['output_format'] not in ('standard', 'latex'):
+            raise ValueError('Choose standard or latex output')
         return operation, args
 
     def estimate_result(service, operation, args):

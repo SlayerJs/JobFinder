@@ -16,7 +16,7 @@ def render_version(service, version_id, extension):
     source = one(service.db, 'sources', profile['source_id'])
     data = version['data']
     if extension == 'tex' and not data.get('latex_source'):
-        raise ValueError('This revision has no LaTeX template. Import a .tex CV to generate LaTeX versions.')
+        raise ValueError('This revision has no LaTeX output. Generate a draft with the LaTeX output option.')
     path = service.private_dir / f"cv-category-{category['id']}-r{version_id}.{extension}"
     if path.exists():
         return path

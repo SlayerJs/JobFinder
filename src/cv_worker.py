@@ -69,7 +69,7 @@ class CVWorker:
             if task['operation'] == 'analyze':
                 result = {'profile_id': self.service.analyze(args['source_id'])}
             elif task['operation'] == 'generate':
-                result = {'version_id': self.service.generate(args['category_id'])}
+                result = {'version_id': self.service.generate(args['category_id'], args.get('output_format', 'standard'))}
             elif task['operation'] == 'classify':
                 result = self.service.classify(progress)
             else:

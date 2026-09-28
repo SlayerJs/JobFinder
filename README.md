@@ -121,6 +121,15 @@ mutation endpoints; run only one web process. It shares `jobs.db` with the CLI.
 
 ### LaTeX versions with your existing layout
 
+For **PDF or DOCX inputs**, choose **PDF, Word and LaTeX (.tex)** under an approved
+category’s **Output formats**, then estimate and generate. The same DeepSeek call
+requests evidence-backed CV text plus LaTeX layout choices (font size and margins).
+The app validates those choices, escapes the text, and restores private contacts
+locally to produce a complete `.tex` document. Download it from the revision page
+and compile using XeLaTeX or LuaLaTeX. Edits produce a new revision with synchronized
+LaTeX output. Format choices have separate generation caches; existing drafts remain
+available. Selecting the standard output continues to offer PDF and DOCX only.
+
 Import a complete `.tex` file containing `\begin{document}` and `\end{document}`.
 The app preserves the original document class, preamble, custom commands, formatting,
 comments and layout. Tailoring changes individual prose spans in place, rather than

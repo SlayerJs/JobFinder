@@ -47,6 +47,8 @@ class FakeProvider:
                     'sections': [{'heading': 'Expérience et formation', 'items': [
                         {'text': f['text'], 'fact_ids': [f['id']]} for f in payload['facts']]}],
                     'changes': ['Expérience mise en avant'], 'suggestions': ['Préciser les projets si documentés']}
+            if 'Output format: standalone LaTeX' in prompt:
+                data['latex_layout'] = {'font_size': 11, 'margin_mm': 18}
         elif prompt.startswith('Classify'):
             context = json.loads(prompt.split('Context (shared once for this batch):\n')[1])
             data = {'results': [{'id': j['id'], 'category_id': context['categories'][0]['id'],
@@ -370,10 +372,13 @@ class WebTests(unittest.TestCase):
                 pid = task('analyze', saved)['profile_id']
                 c = categories(app.state.db)[0]
                 cid = client.post(f'/api/categories/{pid}', json=[{**c['data'], 'id': c['id'], 'approved': True}], headers=headers).json()['category_ids'][0]
-                vid = task('generate', {'category_id': cid})['version_id']
+                invalid = client.post('/api/estimate', json={'operation': 'generate',
+                    'args': {'category_id': cid, 'output_format': 'unknown'}}, headers=headers)
+                self.assertEqual(invalid.status_code, 400)
+                vid = task('generate', {'category_id': cid, 'output_format': 'latex'})['version_id']
                 self.assertIn('Draft: not recommendable', client.get(f'/versions/{vid}').text)
                 self.assertEqual(client.post(f'/api/versions/{vid}/approve', json={'reviewed': True}, headers=headers).status_code, 200)
-                for extension in ['docx', 'pdf']:
+                for extension in ['docx', 'pdf', 'tex']:
                     download = client.get(f'/versions/{vid}/download/{extension}')
                     self.assertEqual(download.status_code, 200, download.text[:200] if extension == 'pdf' and download.status_code != 200 else '')
                     self.assertIn('attachment', download.headers['content-disposition'])

@@ -64,12 +64,13 @@ class BrowserWorkflowTests(unittest.TestCase):
                     category_form = page.locator('form[data-url^="/api/categories/"]')
                     category_form.get_by_label('Approve this category').check()
                     category_form.get_by_role('button', name='Save category review').click()
+                    page.get_by_label('Output formats', exact=True).select_option('latex')
                     operation('Estimate CV generation')
                     revision = page.locator('a[href^="/versions/"]').first
                     expect(revision).to_be_visible(timeout=15000)
                     revision.click()
                     expect(page.get_by_text('Draft: not recommendable', exact=True)).to_be_visible()
-                    for name in ['Download DOCX', 'Download PDF']:
+                    for name in ['Download DOCX', 'Download PDF', 'Download LaTeX']:
                         with page.expect_download() as info:
                             page.get_by_role('link', name=name).click()
                         download = info.value

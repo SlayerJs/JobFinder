@@ -2,6 +2,43 @@
 import re
 
 MAX_LATEX = 200000
+STANDALONE_LATEX_RULES = '''
+Output format: standalone LaTeX, as well as the structured CV used for PDF/DOCX.
+In the same JSON response, also return "latex_layout":{"font_size":11,"margin_mm":18}.
+Choose font_size from 10, 11, 12 and an integer margin_mm from 12 through 30 to suit
+the length of this CV. Return all CV content in the evidence-backed sections above.
+Do not return raw TeX commands in text fields. The app will escape the validated text
+and build a complete UTF-8 LaTeX document for XeLaTeX/LuaLaTeX using your layout.
+Private contact details will be restored locally. Suggestions are not part of the CV.
+'''
+
+
+def standalone_latex(data, contacts, layout):
+    """Build downloadable TeX from the AI's validated content and layout choices."""
+    if (not isinstance(layout, dict) or type(layout.get('font_size')) is not int
+            or layout['font_size'] not in {10, 11, 12} or type(layout.get('margin_mm')) is not int
+            or not 12 <= layout['margin_mm'] <= 30):
+        raise ValueError('LaTeX layout requires font_size 10, 11 or 12 and margin_mm 12–30')
+    layout = {key: layout[key] for key in ('font_size', 'margin_mm')}
+    lines = [
+        '% Compile with XeLaTeX or LuaLaTeX. All text is UTF-8.',
+        rf'\documentclass[{layout["font_size"]}pt,a4paper]{{article}}',
+        r'\usepackage{fontspec}',
+        rf'\usepackage[margin={layout["margin_mm"]}mm]{{geometry}}',
+        r'\setlength{\parindent}{0pt}', r'\setlength{\parskip}{6pt}',
+        r'\begin{document}', r'\begin{center}',
+        r'{\LARGE ' + escape_latex(data['title']) + '}', r'\end{center}',
+    ]
+    for line in contacts.splitlines():
+        if line.strip():
+            lines.append(escape_latex(line) + r'\par')
+    for section in data['sections']:
+        lines.append(r'\section*{' + escape_latex(section['heading']) + '}')
+        for item in section['items']:
+            lines.append(escape_latex(item['text']).replace('\n', r'\newline ' ) + r'\par')
+    lines.append(r'\end{document}')
+    return {**data, 'latex_layout': layout, 'latex_source': '\n'.join(lines) + '\n'}
+
 LATEX_RULES = '''
 This source is a LaTeX CV. Preserve its existing template and layout by editing text slots only.
 Return exactly one CV item per supplied source fact, in source order, with exactly that single fact_id.

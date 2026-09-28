@@ -11,7 +11,7 @@ from src.cv import CVService, categories, extract_cv, one, save_source, source_f
 from src.cv_documents import render_version
 from src.cv_latex import bind_facts, extract_latex, latex_slots, tailor_latex
 from src.database import JobDatabase
-from test_cv import FakeProvider
+from test_cv import FakeProvider, SOURCE
 
 
 LATEX = r'''\documentclass[11pt]{article}
@@ -60,6 +60,45 @@ class LatexTests(unittest.TestCase):
                 extract_cv('valid.tex', LATEX.encode())
         self.assertIn('python -m pip install -r requirements.txt', str(caught.exception))
         self.assertIn('same Python environment', str(caught.exception))
+
+    def test_standalone_output_requested_cached_and_updated_with_edits(self):
+        sid = save_source(self.db, 'cv.docx', SOURCE, 'Name & Contact\nprivate@example.test')
+        pid = self.service.analyze(sid)
+        category = categories(self.db)[0]
+        cid = self.service.save_categories(pid, [{**category['data'], 'id': category['id'], 'approved': True}])[0]
+        standard = self.service.generate(cid)
+        self.assertNotIn('latex_source', one(self.db, 'versions', standard)['data'])
+        self.assertFalse(self.service.estimate('generate', {'category_id': cid, 'output_format': 'latex'})['cached'])
+        latex = self.service.generate(cid, 'latex')
+        self.assertNotEqual(standard, latex)
+        self.assertIn('Output format: standalone LaTeX', self.provider.calls[-1]['messages'][0]['content'])
+        self.assertNotIn('private@example.test', str(self.provider.calls))
+        output = render_version(self.service, latex, 'tex').read_text(encoding='utf-8')
+        self.assertIn(r'\documentclass[11pt,a4paper]{article}', output)
+        self.assertIn(r'Name \& Contact', output)
+        self.assertIn('private@example.test', output)
+        self.assertNotIn('Préciser les projets', output)
+        self.assertEqual(self.service.generate(cid, 'latex'), latex)
+        self.assertTrue(self.service.estimate('generate', {'category_id': cid, 'output_format': 'latex'})['cached'])
+        self.service.approve(latex, True)
+        data = one(self.db, 'versions', latex)['data']
+        data['title'] = r'CV & Python_\input{test}'
+        data['latex_source'] = r'\input{/private-file}'
+        edited = self.service.edit_version(latex, data)
+        text = render_version(self.service, edited, 'tex').read_text(encoding='utf-8')
+        self.assertIn(r'CV \& Python\_\textbackslash{}input\{test\}', text)
+        self.assertNotIn('/private-file', text)
+        self.assertEqual(render_version(self.service, latex, 'tex').read_text(encoding='utf-8'), output)
+        self.assertEqual(len(self.provider.calls), 3)
+
+    def test_invalid_standalone_layout_is_rejected(self):
+        from src.cv_latex import standalone_latex
+        for layout in (None, {}, {'font_size': True, 'margin_mm': 18},
+                       {'font_size': 11, 'margin_mm': 0}, {'font_size': 11, 'margin_mm': '18'}):
+            with self.assertRaises(ValueError):
+                standalone_latex({}, '', layout)
+        with self.assertRaises(ValueError):
+            self.service.generation_prompt({'latex_source': None}, 'unknown')
 
     def test_extracts_macros_accents_and_dates_without_executing(self):
         text = extract_cv('cv.tex', LATEX.encode())
